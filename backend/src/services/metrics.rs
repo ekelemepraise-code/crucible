@@ -213,6 +213,11 @@ impl MetricsRegistry {
         self.file_upload_bytes_total.inc_by(&label, bytes);
     }
 
+    /// Record the current active database pool connection count.
+    pub fn record_db_pool_connections(&self, active_connections: u64) {
+        self.db_pool_connections.set(r#"pool="active""#, active_connections as f64);
+    }
+
     /// Render all metrics in Prometheus text exposition format.
     #[instrument(skip(self))]
     pub fn render(&self) -> String {
@@ -307,6 +312,7 @@ impl Default for MetricsRegistry {
 pub type SharedMetrics = Arc<MetricsRegistry>;
 
 /// Axum handler: `GET /metrics` — returns Prometheus text format.
+#[instrument(skip(metrics))]
 pub async fn metrics_handler(
     State(metrics): State<SharedMetrics>,
 ) -> impl IntoResponse {
@@ -353,6 +359,7 @@ impl Drop for RequestTimer<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::{body::Body, http::Request};
 
     #[test]
     fn counter_increments() {
@@ -450,6 +457,25 @@ mod tests {
         assert!(output.contains("# TYPE http_requests_total counter"));
         // Must contain the labelled counter line
         assert!(output.contains(r#"method="GET""#));
+    }
+
+    #[tokio::test]
+    async fn metrics_handler_returns_prometheus_text() {
+        let metrics = Arc::new(MetricsRegistry::new());
+        let app = axum::Router::new()
+            .route("/metrics", axum::routing::get(metrics_handler))
+            .with_state(metrics.clone());
+
+        let response = app
+            .oneshot(Request::builder().uri("/metrics").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["content-type"], "text/plain; version=0.0.4; charset=utf-8");
+        let body = axum::body::to_bytes(response.into_body()).await.unwrap();
+        let body = std::str::from_utf8(&body).unwrap();
+        assert!(body.contains("process_start_time_seconds"));
     }
 
     #[test]

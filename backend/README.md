@@ -106,11 +106,15 @@ docker compose up -d --build
 # Check service health
 docker compose ps
 
-# Test the health endpoint
-curl http://localhost:8080/health
+# Test the health endpoints
+curl http://localhost:8080/health/live
+curl http://localhost:8080/health/ready
 
-# Expected response:
-# {"status":"ok","version":"0.1.0","database":"healthy","redis":"healthy"}
+# Expected readiness response:
+# {"status":"healthy","database":"healthy","cache":"healthy","version":"0.1.0"}
+
+# Test the metrics endpoint
+curl http://localhost:8080/metrics
 
 # Test the API status endpoint
 curl http://localhost:8080/api/v1/status
