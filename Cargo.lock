@@ -1052,7 +1052,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "crucible-example-emergency-stop"
+version = "0.1.0"
+dependencies = [
+ "crucible",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "crucible-example-escrow"
+version = "0.1.0"
+dependencies = [
+ "crucible",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "crucible-example-gasless"
+version = "0.1.0"
+dependencies = [
+ "crucible",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "crucible-example-staking"
+version = "0.1.0"
+dependencies = [
+ "crucible",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "crucible-example-time-locked-vault"
 version = "0.1.0"
 dependencies = [
  "crucible",
