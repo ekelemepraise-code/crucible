@@ -79,6 +79,12 @@ impl ReputationContract {
     }
 }
 
+impl Default for ReputationContract {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContractFunctionSet for ReputationContract {
     fn call(&self, func: &str, env: Env, args: &[Val]) -> Option<Val> {
         let addr = |i: usize| -> Option<Address> {
@@ -166,6 +172,19 @@ impl ReputationContractClient {
         let args: soroban_sdk::Vec<Val> = (account,).try_into_val(&self.env).unwrap();
         self.env
             .invoke_contract::<i32>(&self.address, &symbol_short!("get_rep"), args)
+    }
+}
+
+#[cfg(test)]
+impl ReputationContractClient {
+    /// Test-only helper that mocks all authorizations before running `f`.
+    ///
+    /// Use this in tests that exercise happy-path contract behavior. For
+    /// authorization tests, prefer `MockEnv::mock_auths` with specific entries
+    /// so missing or invalid auth is not masked.
+    pub fn with_mock_all_auths<R>(&self, f: impl FnOnce(&Self) -> R) -> R {
+        self.env.mock_all_auths();
+        f(self)
     }
 }
 

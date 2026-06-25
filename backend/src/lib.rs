@@ -1,6 +1,7 @@
 //! Crucible backend library crate.
 
 pub mod api;
+pub mod app_state;
 pub mod config;
 pub mod db;
 pub mod error;
@@ -14,4 +15,3 @@ pub mod workers;
 pub mod test_utils;
 
 pub use error::AppError;
-

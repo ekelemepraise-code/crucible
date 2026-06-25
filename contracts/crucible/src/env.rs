@@ -127,6 +127,16 @@ pub struct CapturedEvent {
     pub data: Val,
 }
 
+impl std::fmt::Debug for CapturedEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CapturedEvent")
+            .field("contract", &self.contract)
+            .field("topics", &self.topics)
+            .field("data", &self.data)
+            .finish()
+    }
+}
+
 impl CapturedEvent {
     /// Returns the contract address that emitted the event.
     pub fn contract(&self) -> Address {
