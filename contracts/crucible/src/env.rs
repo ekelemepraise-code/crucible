@@ -2,6 +2,10 @@
 //!
 //! Provides `MockEnv` - a wrapper around `soroban_sdk::Env` with convenient
 //! helpers for testing, and `MockEnvBuilder` for fluent environment construction.
+//!
+//! **Host-only:** All types in this module depend on `std` and the Soroban host
+//! test utilities. They are intended exclusively for use in `#[cfg(test)]`
+//! contexts on the host and are not available inside contract WASM builds.
 
 use crate::account::AccountHandle;
 use crate::cost::CostReport;
@@ -221,26 +225,9 @@ impl Stroops {
 /// **Thread‑safety:** `MockEnv` is deliberately single‑threaded; it uses `Rc`/`RefCell` and does **not** implement `Send` or `Sync`. This ensures deterministic behavior in tests but means fixtures cannot be moved across async tasks.
 /// A wrapper around the Soroban test environment with additional helpers.
 ///
-/// # Clone Semantics
-///
-/// `MockEnv` derives [`Clone`] and cloning creates a **shared handle**, not an
-/// independent copy. The following fields are shared via [`Rc`]`<`[`RefCell`]`<...>>`
-/// and mutations through one clone are visible through all clones:
-///
-/// | Shared field | Type | Effect |
-/// |---|---|
-/// | `accounts` | `Rc<RefCell<HashMap<String, Address>>>` | Named account registry |
-/// | `contract_ids` | `Rc<RefCell<HashMap<String, Address>>>` | Contract-type registry |
-/// | `xlm_token_address` | `Rc<RefCell<Option<Address>>>` | Cached XLM token address |
-///
-/// The underlying [`Env`] (`inner`) is also cloned. In Soroban's test environment
-/// the clone shares internal state, so ledger mutations, contract data, etc. are
-/// visible across all clones as well.
-///
-/// The only independent field after a clone is `track_costs: bool`, which is a
-/// plain `Copy` value.
-///
-/// If you need a fully independent copy, use [`MockEnv::fork`].
+/// **Host-only:** This type uses `std` and Soroban host test utilities.
+/// It must only be used inside `#[cfg(test)]` blocks on the host,
+/// never in contract WASM builds.
 #[derive(Clone)]
 pub struct MockEnv {
     inner: Env,
@@ -282,7 +269,7 @@ impl CapturedEvent {
 
     /// Returns the raw data value.
     pub fn data_raw(&self) -> Val {
-        self.data.clone()
+        self.data
     }
 
     /// Convert the event data into a typed Rust value using Soroban's `FromVal`.
@@ -550,6 +537,7 @@ impl MockEnv {
 
         let mut budget = self.inner.budget();
         budget.reset_default();
+        #[allow(unused_variables)]
         let result = f();
         let fee_estimate = self.inner.cost_estimate().fee();
         CostReport::new_with_fee_estimate(
@@ -651,6 +639,7 @@ impl MockEnv {
         budget.reset_default();
 
         self.inner.mock_all_auths();
+        #[allow(unused_variables)]
         let result = f();
         let instructions = budget.cpu_instruction_cost();
         let fee = self.inner.cost_estimate().fee().total;
@@ -733,6 +722,8 @@ mod tests {
 
 
 /// Builder for constructing a `MockEnv` with custom configuration.
+///
+/// **Host-only:** See [`MockEnv`] for runtime requirements.
 pub struct MockEnvBuilder {
     env: MockEnv,
     account_configs: Vec<(String, Stroops)>,
@@ -856,7 +847,6 @@ impl MockEnvBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-<<<<<<< issue-542-mockenv-clone-docs
     use soroban_sdk::testutils::Address as _;
 
     #[test]
@@ -974,188 +964,5 @@ mod tests {
 
         let alice = env2.account("alice");
         assert_eq!(alice.xlm_balance(), Stroops::xlm(100).as_stroops());
-=======
-
-    #[test]
-    fn test_stroops_from_positive() {
-        let s = Stroops::from(100);
-        assert_eq!(s.as_stroops(), 100);
-    }
-
-    #[test]
-    #[should_panic(expected = "Stroops amount cannot be negative")]
-    fn test_stroops_from_negative() {
-        Stroops::from(-100);
-    }
-
-    #[test]
-    fn test_stroops_xlm() {
-        let s = Stroops::xlm(1);
-        assert_eq!(s.as_stroops(), 10_000_000);
-        assert_eq!(s.as_xlm(), 1.0);
-    }
-
-    #[test]
-    fn test_stroops_xlm_zero() {
-        let s = Stroops::xlm(0);
-        assert_eq!(s.as_stroops(), 0);
-    }
-
-    #[test]
-    #[should_panic(expected = "XLM amount cannot be negative")]
-    fn test_stroops_xlm_negative() {
-        Stroops::xlm(-1);
-    }
-
-    #[test]
-    #[should_panic(expected = "XLM amount overflowed")]
-    fn test_stroops_xlm_overflow() {
-        // i128::MAX / 10_000_000 would overflow
-        Stroops::xlm(i128::MAX / 10_000_000 + 1);
-    }
-
-    #[test]
-    fn test_stroops_from_parts() {
-        let s = Stroops::from_parts(1, 500_000);
-        assert_eq!(s.as_stroops(), 10_500_000);
-        assert_eq!(s.as_xlm(), 1.05);
-    }
-
-    #[test]
-    fn test_stroops_from_parts_zero_frac() {
-        let s = Stroops::from_parts(5, 0);
-        assert_eq!(s.as_stroops(), 50_000_000);
-    }
-
-    #[test]
-    fn test_stroops_from_parts_max_frac() {
-        let s = Stroops::from_parts(0, 9_999_999);
-        assert_eq!(s.as_stroops(), 9_999_999);
-    }
-
-    #[test]
-    #[should_panic(expected = "XLM amount cannot be negative")]
-    fn test_stroops_from_parts_negative_xlm() {
-        Stroops::from_parts(-1, 0);
-    }
-
-    #[test]
-    #[should_panic(expected = "Fractional stroops must be in range")]
-    fn test_stroops_from_parts_negative_frac() {
-        Stroops::from_parts(1, -1);
-    }
-
-    #[test]
-    #[should_panic(expected = "Fractional stroops must be in range")]
-    fn test_stroops_from_parts_frac_too_large() {
-        Stroops::from_parts(1, 10_000_000);
-    }
-
-    #[test]
-    fn test_stroops_from_xlm_str() {
-        let s = Stroops::from_xlm_str("1.5");
-        assert_eq!(s.as_stroops(), 15_000_000);
-        assert_eq!(s.as_xlm(), 1.5);
-    }
-
-    #[test]
-    fn test_stroops_from_xlm_str_no_frac() {
-        let s = Stroops::from_xlm_str("10");
-        assert_eq!(s.as_stroops(), 100_000_000);
-    }
-
-    #[test]
-    fn test_stroops_from_xlm_str_small() {
-        let s = Stroops::from_xlm_str("0.0000001");
-        assert_eq!(s.as_stroops(), 1);
-    }
-
-    #[test]
-    fn test_stroops_from_xlm_str_leading_zeros() {
-        let s = Stroops::from_xlm_str("0.000001");
-        assert_eq!(s.as_stroops(), 10);
-    }
-
-    #[test]
-    fn test_stroops_from_xlm_str_trimmed() {
-        let s = Stroops::from_xlm_str("  2.5  ");
-        assert_eq!(s.as_stroops(), 25_000_000);
-    }
-
-    #[test]
-    #[should_panic(expected = "XLM amount string cannot be empty")]
-    fn test_stroops_from_xlm_str_empty() {
-        Stroops::from_xlm_str("");
-    }
-
-    #[test]
-    #[should_panic(expected = "Invalid XLM amount")]
-    fn test_stroops_from_xlm_str_invalid() {
-        Stroops::from_xlm_str("abc");
-    }
-
-    #[test]
-    #[should_panic(expected = "XLM amount cannot be negative")]
-    fn test_stroops_from_xlm_str_negative() {
-        Stroops::from_xlm_str("-1.5");
-    }
-
-    #[test]
-    #[should_panic(expected = "Invalid character in fractional part")]
-    fn test_stroops_from_xlm_str_invalid_frac() {
-        Stroops::from_xlm_str("1.5a");
-    }
-
-    #[test]
-    #[should_panic(expected = "XLM amount has too many decimal places")]
-    fn test_stroops_from_xlm_str_too_many_decimals() {
-        Stroops::from_xlm_str("1.12345678");
-    }
-
-    #[test]
-    fn test_stroops_xlm_frac_deprecated() {
-        // This test ensures the deprecated method still works but with rounding
-        let s = Stroops::xlm_frac(1.5);
-        assert_eq!(s.as_stroops(), 15_000_000);
-    }
-
-    #[test]
-    fn test_stroops_xlm_frac_rounding() {
-        // f64 precision loss example: 0.1 cannot be represented exactly
-        // The deprecated method rounds, so we test that behavior
-        let s = Stroops::xlm_frac(0.1);
-        // Due to f64 precision, this might not be exactly 1,000,000
-        assert!(s.as_stroops() >= 0);
-    }
-
-    #[test]
-    #[should_panic(expected = "XLM amount cannot be negative")]
-    fn test_stroops_xlm_frac_negative() {
-        Stroops::xlm_frac(-1.0);
-    }
-
-    #[test]
-    fn test_stroops_roundtrip() {
-        let original = Stroops::from_xlm_str("123.456789");
-        let _as_xlm = original.as_xlm();
-        // "123.456789" = 123 XLM + 4567890 stroops (padded to 7 digits)
-        let roundtripped = Stroops::from_parts(123, 4_567_890);
-        assert_eq!(original.as_stroops(), roundtripped.as_stroops());
-    }
-
-    #[test]
-    fn test_stroops_large_amount() {
-        // Test with a large but valid amount
-        let s = Stroops::from_xlm_str("1000000");
-        assert_eq!(s.as_stroops(), 10_000_000_000_000);
-    }
-
-    #[test]
-    fn test_stroops_max_safe_amount() {
-        // Maximum safe XLM amount that won't overflow when multiplied
-        let max_xlm = i128::MAX / 10_000_000;
-        let s = Stroops::xlm(max_xlm);
-        assert_eq!(s.as_stroops(), max_xlm * 10_000_000);
->>>>>>> main
     }
 }

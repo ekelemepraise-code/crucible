@@ -2,6 +2,11 @@
 //!
 //! Provides `MockToken` - a wrapper around the Stellar Asset Contract (SAC)
 //! for easy token operations in tests without manual WASM deployment.
+//!
+//! **Host-only:** All types in this module depend on [`MockEnv`] and `std`
+//! and are intended exclusively for use in `#[cfg(test)]` contexts on the host.
+//!
+//! [`MockEnv`]: crate::env::MockEnv
 
 use crate::env::MockEnv;
 use soroban_sdk::{
@@ -61,6 +66,11 @@ impl std::error::Error for ParseAmountError {}
 ///
 /// This provides a convenient way to create and manipulate tokens in tests
 /// without needing to deploy actual token WASM contracts.
+///
+/// **Host-only:** This type depends on [`MockEnv`] and `std` and must only
+/// be used inside `#[cfg(test)]` blocks on the host.
+///
+/// [`MockEnv`]: crate::env::MockEnv
 #[derive(Clone)]
 pub struct MockToken {
     env: Env,

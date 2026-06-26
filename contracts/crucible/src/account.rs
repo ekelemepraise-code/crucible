@@ -3,6 +3,11 @@
 //! Provides `AccountHandle` - a wrapper around a Soroban `Address` with
 //! keypair signing support and balance helpers, and `AccountBuilder` for
 //! easy pre-funded account creation.
+//!
+//! **Host-only:** All types in this module depend on [`MockEnv`] and `std`
+//! and are intended exclusively for use in `#[cfg(test)]` contexts on the host.
+//!
+//! [`MockEnv`]: crate::env::MockEnv
 
 use crate::env::{MockEnv, Stroops};
 use crate::token::MockToken;

@@ -1,44 +1,14 @@
-//! Transaction simulation: inspect-only dry-runs and commit-capable flows.
+//! Simulated transaction dry-runs and fee estimation.
 //!
-//! Two distinct APIs are exposed so the state-mutation guarantees of each are
-//! explicit and a commit closure never has to be carried around when it isn't
-//! needed:
+//! **Host-only:** [`SimulatedTx`] is constructed by [`MockEnv::simulate`] and
+//! depends on the Soroban host test utilities. It is intended exclusively for
+//! use in `#[cfg(test)]` contexts on the host.
 //!
-//! * [`SimulatedTx`] — produced by [`MockEnv::simulate`](crate::env::MockEnv::simulate).
-//!   A pure **inspection** of a call's fee, instruction count, required auths
-//!   and result. It holds no closure and imposes no `'static` bound, so it can
-//!   borrow freely from its surroundings and is cheap to pass around.
-//!
-//! * [`PreparedTx`] — produced by [`MockEnv::prepare`](crate::env::MockEnv::prepare).
-//!   A **commit-capable** dry-run. It owns the call closure so the call can be
-//!   re-executed and its state changes applied via [`PreparedTx::commit`]. The
-//!   closure executes exactly twice across the prepare/commit flow: once during
-//!   `prepare` (for the estimate) and once during `commit` (to apply state).
-//!
-//! Use `simulate` when you only want to *look* at what a call would do; use
-//! `prepare`/`commit` when you intend to actually apply it after inspecting the
-//! estimate.
-
+//! [`MockEnv::simulate`]: crate::env::MockEnv::simulate
+/// without committing the state changes.
 use soroban_sdk::Address;
 
-/// An inspect-only dry-run of a contract call.
-///
-/// Captures the metrics and result of executing a call **without** retaining
-/// any way to commit it. There is no commit closure and no `'static`
-/// requirement on the result type, which keeps inspection cheap and free of
-/// lifetime pressure.
-///
-/// Obtain one from [`MockEnv::simulate`](crate::env::MockEnv::simulate). If you
-/// need to commit the call afterwards, use
-/// [`MockEnv::prepare`](crate::env::MockEnv::prepare) instead.
-///
-/// ```ignore
-/// // Inspect-only: peek at the cost without changing any state.
-/// let sim = env.simulate(|| client.transfer(&from, &to, &100));
-/// assert!(sim.would_succeed());
-/// println!("would cost {} stroops", sim.fee());
-/// // `sim` carries no closure — nothing was committed.
-/// ```
+
 pub struct SimulatedTx<T> {
     fee: i64,
     instructions: u64,
