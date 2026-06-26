@@ -2,6 +2,10 @@
 //!
 //! Provides `MockEnv` - a wrapper around `soroban_sdk::Env` with convenient
 //! helpers for testing, and `MockEnvBuilder` for fluent environment construction.
+//!
+//! **Host-only:** All types in this module depend on `std` and the Soroban host
+//! test utilities. They are intended exclusively for use in `#[cfg(test)]`
+//! contexts on the host and are not available inside contract WASM builds.
 
 use crate::account::AccountHandle;
 use crate::cost::CostReport;
@@ -109,6 +113,10 @@ impl Stroops {
 }
 
 /// A wrapper around the Soroban test environment with additional helpers.
+///
+/// **Host-only:** This type uses `std` and Soroban host test utilities.
+/// It must only be used inside `#[cfg(test)]` blocks on the host,
+/// never in contract WASM builds.
 #[derive(Clone)]
 pub struct MockEnv {
     inner: Env,
@@ -150,7 +158,7 @@ impl CapturedEvent {
 
     /// Returns the raw data value.
     pub fn data_raw(&self) -> Val {
-        self.data.clone()
+        self.data
     }
 
     /// Convert the event data into a typed Rust value using Soroban's FromVal.
@@ -388,6 +396,7 @@ impl MockEnv {
 
         let mut budget = self.inner.budget();
         budget.reset_default();
+        #[allow(unused_variables)]
         let result = f();
         let fee_estimate = self.inner.cost_estimate().fee();
         CostReport::new_with_fee_estimate(
@@ -411,6 +420,7 @@ impl MockEnv {
         budget.reset_default();
 
         self.inner.mock_all_auths();
+        #[allow(unused_variables)]
         let result = f();
         let instructions = budget.cpu_instruction_cost();
         let fee = self.inner.cost_estimate().fee().total;
@@ -468,6 +478,8 @@ impl std::fmt::Debug for MockEnv {
 }
 
 /// Builder for constructing a `MockEnv` with custom configuration.
+///
+/// **Host-only:** See [`MockEnv`] for runtime requirements.
 pub struct MockEnvBuilder {
     env: MockEnv,
     account_configs: Vec<(String, Stroops)>,

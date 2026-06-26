@@ -102,7 +102,7 @@ fn format_with_commas(n: u64) -> String {
     for (i, &c) in chars.iter().enumerate() {
         result.push(c);
         let remaining = len - i - 1;
-        if remaining > 0 && remaining % 3 == 0 {
+        if remaining > 0 && remaining.is_multiple_of(3) {
             result.push(',');
         }
     }
@@ -123,10 +123,18 @@ struct CostSnapshot {
 
 #[cfg(feature = "snapshots")]
 impl CostReport {
+    /// Assert that this report's costs are within 5% of a saved snapshot.
+    ///
+    /// **Requires the `snapshots` feature (which implies `std`).**
+    /// This method performs filesystem I/O and is a host-only test utility.
     pub fn assert_snapshot(&self, name: &str) {
         self.assert_snapshot_with_tolerance(name, 0.05);
     }
 
+    /// Assert costs are within `tolerance` (e.g. `0.1` = 10%) of a saved snapshot.
+    ///
+    /// **Requires the `snapshots` feature (which implies `std`).**
+    /// This method performs filesystem I/O and is a host-only test utility.
     pub fn assert_snapshot_with_tolerance(&self, name: &str, tolerance: f64) {
         use std::fs;
         use std::path::PathBuf;

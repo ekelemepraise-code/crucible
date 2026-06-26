@@ -1,9 +1,14 @@
 //! Simulated transaction dry-runs and fee estimation.
-
+//!
+//! **Host-only:** [`SimulatedTx`] is constructed by [`MockEnv::simulate`] and
+//! depends on the Soroban host test utilities. It is intended exclusively for
+//! use in `#[cfg(test)]` contexts on the host.
+//!
+//! [`MockEnv::simulate`]: crate::env::MockEnv::simulate
+/// without committing the state changes.
 use soroban_sdk::Address;
 
-/// A simulated transaction that allows inspecting the results of a contract call
-/// without committing the state changes.
+
 pub struct SimulatedTx<T> {
     fee: i64,
     instructions: u64,
