@@ -4,7 +4,8 @@ extern crate std;
 use crucible::assert_reverts;
 use crucible::prelude::*;
 
-use crate::{Vesting, VestingClient};
+use crate::{Vesting, VestingClient, ContractError};
+use soroban_sdk::testutils::Ledger;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -182,4 +183,144 @@ fn test_vested_increases_monotonically_with_time() {
     assert_eq!(v1, 0); // cliff boundary
     assert!(v2 > v1);
     assert_eq!(v3, TOTAL);
+}
+
+#[test]
+fn test_initialize_overflow_start_plus_cliff() {
+    let env = MockEnv::builder()
+        .at_timestamp(BASE_TIME)
+        .with_contract::<Vesting>()
+        .with_account("admin", Stroops::xlm(100))
+        .with_account("beneficiary", Stroops::xlm(10))
+        .build();
+
+    let id = env.contract_id::<Vesting>();
+    let admin = env.account("admin");
+    let beneficiary = env.account("beneficiary");
+
+    let token = MockToken::new(&env, "VEST", 7);
+    token.mint(&admin, TOTAL);
+
+    env.mock_all_auths();
+    
+    // start + cliff overflows (u64::MAX + 1)
+    let start = u64::MAX;
+    let cliff = 1;
+    let duration = 100;
+    
+    let res = VestingClient::new(env.inner(), &id).try_initialize(
+        &admin,
+        &beneficiary,
+        &token.address(),
+        &TOTAL,
+        &start,
+        &cliff,
+        &duration,
+    );
+    
+    assert!(res.is_err());
+    let err = res.err().unwrap();
+    match err {
+        Ok(e) => {
+            assert_eq!(
+                e,
+                soroban_sdk::Error::from_contract_error(ContractError::Overflow as u32)
+            );
+        }
+        _ => panic!("Expected contract error, got {:?}", err),
+    }
+}
+
+#[test]
+fn test_initialize_overflow_cliff_end_plus_duration() {
+    let env = MockEnv::builder()
+        .at_timestamp(BASE_TIME)
+        .with_contract::<Vesting>()
+        .with_account("admin", Stroops::xlm(100))
+        .with_account("beneficiary", Stroops::xlm(10))
+        .build();
+
+    let id = env.contract_id::<Vesting>();
+    let admin = env.account("admin");
+    let beneficiary = env.account("beneficiary");
+
+    let token = MockToken::new(&env, "VEST", 7);
+    token.mint(&admin, TOTAL);
+
+    env.mock_all_auths();
+    
+    // cliff_end + duration overflows (u64::MAX - 100 + 50 + 51 = u64::MAX + 1)
+    let start = u64::MAX - 100;
+    let cliff = 50;
+    let duration = 51;
+    
+    let res = VestingClient::new(env.inner(), &id).try_initialize(
+        &admin,
+        &beneficiary,
+        &token.address(),
+        &TOTAL,
+        &start,
+        &cliff,
+        &duration,
+    );
+    
+    assert!(res.is_err());
+    let err = res.err().unwrap();
+    match err {
+        Ok(e) => {
+            assert_eq!(
+                e,
+                soroban_sdk::Error::from_contract_error(ContractError::Overflow as u32)
+            );
+        }
+        _ => panic!("Expected contract error, got {:?}", err),
+    }
+}
+
+#[test]
+fn test_initialize_near_max_valid_schedule() {
+    let env = MockEnv::builder()
+        .at_timestamp(u64::MAX - 150)
+        .with_contract::<Vesting>()
+        .with_account("admin", Stroops::xlm(100))
+        .with_account("beneficiary", Stroops::xlm(10))
+        .build();
+
+    let id = env.contract_id::<Vesting>();
+    let admin = env.account("admin");
+    let beneficiary = env.account("beneficiary");
+
+    let token = MockToken::new(&env, "VEST", 7);
+    token.mint(&admin, TOTAL);
+
+    env.mock_all_auths();
+    
+    // Valid near-max (u64::MAX - 100 + 50 + 50 = u64::MAX, no overflow)
+    let start = u64::MAX - 100;
+    let cliff = 50;
+    let duration = 50;
+    
+    let client = VestingClient::new(env.inner(), &id);
+    client.initialize(
+        &admin,
+        &beneficiary,
+        &token.address(),
+        &TOTAL,
+        &start,
+        &cliff,
+        &duration,
+    );
+    
+    // Check vested amounts at boundaries
+    env.inner().ledger().set_timestamp(start + cliff - 1);
+    assert_eq!(client.vested(), 0);
+    
+    env.inner().ledger().set_timestamp(start + cliff);
+    assert_eq!(client.vested(), 0);
+    
+    env.inner().ledger().set_timestamp(start + cliff + duration / 2);
+    assert_eq!(client.vested(), TOTAL / 2);
+    
+    env.inner().ledger().set_timestamp(start + cliff + duration);
+    assert_eq!(client.vested(), TOTAL);
 }

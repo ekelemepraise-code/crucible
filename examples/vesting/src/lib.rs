@@ -1,6 +1,6 @@
 #![no_std]
 #![allow(deprecated)]
-use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env};
+use soroban_sdk::{contract, contracterror, contractimpl, contracttype, panic_with_error, token, Address, Env};
 
 /// Persistent state for the vesting schedule.
 #[contracttype]
@@ -26,6 +26,13 @@ pub struct VestingSchedule {
 enum DataKey {
     Admin,
     Schedule,
+}
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum ContractError {
+    Overflow = 1,
 }
 
 /// A cliff + linear vesting contract.
@@ -55,6 +62,13 @@ impl Vesting {
         duration: u64,
     ) {
         admin.require_auth();
+        let cliff_end = start.checked_add(cliff).unwrap_or_else(|| {
+            panic_with_error!(&env, ContractError::Overflow);
+        });
+        let _vesting_end = cliff_end.checked_add(duration).unwrap_or_else(|| {
+            panic_with_error!(&env, ContractError::Overflow);
+        });
+
         token::Client::new(&env, &token).transfer(&admin, env.current_contract_address(), &total);
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(
@@ -140,11 +154,15 @@ impl Vesting {
 
     fn vested_at(env: &Env, s: &VestingSchedule) -> i128 {
         let now = env.ledger().timestamp();
-        let cliff_end = s.start + s.cliff;
+        let cliff_end = s.start.checked_add(s.cliff).unwrap_or_else(|| {
+            panic_with_error!(env, ContractError::Overflow);
+        });
         if now < cliff_end {
             return 0;
         }
-        let vesting_end = cliff_end + s.duration;
+        let vesting_end = cliff_end.checked_add(s.duration).unwrap_or_else(|| {
+            panic_with_error!(env, ContractError::Overflow);
+        });
         if now >= vesting_end {
             s.total
         } else {
