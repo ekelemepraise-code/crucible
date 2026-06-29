@@ -382,12 +382,55 @@ impl MockEnv {
         self.inner.mock_auths(auths);
     }
 
+    /// Returns the current ledger timestamp (UNIX seconds).
+    pub fn timestamp(&self) -> u64 {
+        self.inner.ledger().get().timestamp
+    }
+
     /// Advance the ledger timestamp by a duration.
     pub fn advance_time(&self, duration: Duration) {
         let info = self.inner.ledger().get();
         self.inner.ledger().set(soroban_sdk::testutils::LedgerInfo {
             sequence_number: info.sequence_number,
             timestamp: info.timestamp + duration.as_seconds(),
+            protocol_version: info.protocol_version,
+            base_reserve: info.base_reserve,
+            network_id: info.network_id,
+            min_temp_entry_ttl: info.min_temp_entry_ttl,
+            min_persistent_entry_ttl: info.min_persistent_entry_ttl,
+            max_entry_ttl: info.max_entry_ttl,
+        });
+    }
+
+    /// Advance the ledger timestamp by `months` using calendar month arithmetic.
+    ///
+    /// When the current day does not exist in the target month (e.g. Jan 31 → Feb),
+    /// the result is clamped to the last valid day of that month.
+    pub fn advance_time_by_months(&self, months: u32) {
+        let info = self.inner.ledger().get();
+        let new_timestamp = crate::time::add_months(info.timestamp, months);
+        self.inner.ledger().set(soroban_sdk::testutils::LedgerInfo {
+            sequence_number: info.sequence_number,
+            timestamp: new_timestamp,
+            protocol_version: info.protocol_version,
+            base_reserve: info.base_reserve,
+            network_id: info.network_id,
+            min_temp_entry_ttl: info.min_temp_entry_ttl,
+            min_persistent_entry_ttl: info.min_persistent_entry_ttl,
+            max_entry_ttl: info.max_entry_ttl,
+        });
+    }
+
+    /// Advance the ledger timestamp by `years` using calendar year arithmetic.
+    ///
+    /// When the current day does not exist in the target year (e.g. Feb 29 → non-leap year),
+    /// the result is clamped to Feb 28.
+    pub fn advance_time_by_years(&self, years: u32) {
+        let info = self.inner.ledger().get();
+        let new_timestamp = crate::time::add_years(info.timestamp, years);
+        self.inner.ledger().set(soroban_sdk::testutils::LedgerInfo {
+            sequence_number: info.sequence_number,
+            timestamp: new_timestamp,
             protocol_version: info.protocol_version,
             base_reserve: info.base_reserve,
             network_id: info.network_id,
@@ -1042,6 +1085,39 @@ mod extra_tests {
 
         let alice = env2.account("alice");
         assert_eq!(alice.xlm_balance(), Stroops::xlm(100).as_stroops());
+    }
+}
+
+#[cfg(test)]
+mod time_advance_tests {
+    use super::*;
+    use crate::time::{add_months, datetime_to_unix};
+
+    const JAN_31_2024: u64 = 1_706_704_245;
+    const MAR_15_2024: u64 = 1_710_489_600;
+
+    #[test]
+    fn advance_time_by_months_updates_ledger() {
+        let env = MockEnv::builder().at_timestamp(JAN_31_2024).build();
+        env.advance_time_by_months(1);
+        assert_eq!(
+            env.timestamp(),
+            datetime_to_unix(2024, 2, 29, 12, 30, 45)
+        );
+    }
+
+    #[test]
+    fn advance_time_by_years_updates_ledger() {
+        let env = MockEnv::builder().at_timestamp(MAR_15_2024).build();
+        env.advance_time_by_years(1);
+        assert_eq!(env.timestamp(), datetime_to_unix(2025, 3, 15, 8, 0, 0));
+    }
+
+    #[test]
+    fn advance_time_by_months_chains_with_existing_timestamp() {
+        let env = MockEnv::builder().at_timestamp(MAR_15_2024).build();
+        env.advance_time_by_months(6);
+        assert_eq!(env.timestamp(), add_months(MAR_15_2024, 6));
     }
 }
 

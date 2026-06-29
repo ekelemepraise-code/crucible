@@ -14,6 +14,7 @@ pub use crate::env::MockEnvBuilder;
 pub use crate::env::Stroops;
 pub use crate::sim::PreparedTx;
 pub use crate::sim::SimulatedTx;
+pub use crate::time::{add_months, add_years};
 pub use crate::token::MockToken;
 
 #[cfg(feature = "derive")]
