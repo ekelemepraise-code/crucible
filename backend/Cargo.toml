@@ -15,6 +15,10 @@ path = "src/main.rs"
 name = "backup"
 path = "src/bin/backup.rs"
 
+[[bin]]
+name = "ci-report"
+path = "src/bin/ci_report.rs"
+
 [[bench]]
 name = "performance"
 harness = false
